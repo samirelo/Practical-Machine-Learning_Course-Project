@@ -1,0 +1,73 @@
+
+# Practical Machine Learning Course Project : Learning Algortithm for Personal Activiy Monitoring.
+========================================================
+
+## Summary
+
+The data analysis conducted below provides a description of the algorithm used to predict personal activity monitoring using health monitoring devices. Based on the data, future outcomes are predicted on new test data. The training set accuracy was recorded as 99%.
+
+## Loading and cleaning Data
+
+```{r}
+library(caret)
+library(randomForest)
+library(doParallel)
+cl<-makeCluster(detectCores())
+registerDoParallel(cl)
+testBulk <- read.csv("pml-testing.csv",na.strings=c("NA",""))
+trainBulk <- read.csv("pml-training.csv",na.strings=c("NA",""))
+NAs <- apply(trainBulk,2,function(x) {sum(is.na(x))}) 
+cleanTrain <- trainBulk[,which(NAs == 0)]
+cleanTest <- testBulk[,which(NAs == 0)]
+
+```
+
+## Building data sets for training and cross validation. 
+Around 70% of the data is used for the training and 30% for Cross Validation.
+```{r}
+trainIndex <- createDataPartition(y = cleanTrain$classe, p=0.7,list=FALSE)
+trainSet <- cleanTrain[trainIndex,]
+crossValidationSet <- cleanTrain[-trainIndex,]
+# Removing variables that have time, or names in it, also new_window. Columns 1..6
+removeIndex <- as.integer(c(1,2,3,4,5,6))
+trainSet <- trainSet[,-removeIndex]
+testSet <- cleanTest[,-removeIndex]
+```
+
+## Training
+```{r}
+mytrControl = trainControl(method = "cv", number = 4)
+modelFit <- train(trainSet$classe ~.,data = trainSet, method="rf", trControl = mytrControl)
+modelFit
+```
+
+
+## Cross Validation
+```{r}
+predicted <- predict(modelFit, crossValidationSet)
+SampleError <- sum(predicted == crossValidationSet$classe)/nrow(crossValidationSet)
+```
+So the Out of Sample Error we get is: `r SampleError`
+
+
+## Testing on new data
+```{r}
+answers <-predict(modelFit, testSet)
+length(answers)
+```
+
+
+```{r}
+pml_write_files = function(answers){
+  n = length(answers)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(answers[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+```
+
+
+```{r}
+pml_write_files(answers)
+```
